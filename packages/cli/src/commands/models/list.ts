@@ -9,6 +9,8 @@ import {
   type Config,
   tokenLimit,
   DEFAULT_TOKEN_LIMIT,
+  debugLogger,
+  getAuthTypeFromEnv,
 } from '@google/gemini-cli-core';
 import chalk from 'chalk';
 import { loadSettings, type LoadedSettings } from '../../config/settings.js';
@@ -115,6 +117,20 @@ export async function handleList(
   initializeOutputListenersAndFlush(config);
 
   await config.storage.initialize();
+
+  // Resolve auth so model availability flags (latest Flash, Gemini 3.1,
+  // preview access) reflect the user's account, matching /model.
+  // If no auth is configured or refreshing it fails, fall back to the
+  // baseline model list instead of exiting.
+  const authType =
+    settings.merged.security.auth.selectedType || getAuthTypeFromEnv();
+  if (authType) {
+    try {
+      await config.refreshAuth(authType);
+    } catch (e) {
+      debugLogger.debug(`models list: could not refresh auth: ${e}`);
+    }
+  }
 
   const models = getModelListings(config, settings);
 
